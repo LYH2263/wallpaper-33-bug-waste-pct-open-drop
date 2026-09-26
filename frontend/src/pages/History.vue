@@ -11,11 +11,13 @@ function wasteLabel(r) {
 </script>
 <template>
   <div class="page"><h1>记录</h1><ul>
-    <li v-for="r in items" :key="r.id">{{ r.wall_name }} →
+    <li v-for="r in items" :key="r.id">
+      <router-link :to="`/history/${r.id}`" class="run-link">#{{ r.id }}</router-link>
+      {{ r.wall_name }} →
       订货 <strong>{{ orderOf(r) }}</strong> 卷
       <template v-if="r.result?.waste_enabled">（{{ wasteLabel(r) }}）</template>
     </li>
   </ul>
-  <p class="hint">开放视图保留备损开关与百分比字段；订货卷数取列表接口返回值。</p>
+  <p class="hint">点编号打开详情：显示写入时的基础卷数、备损百分比与订货卷数，不随后续设置变化。</p>
   </div>
 </template>

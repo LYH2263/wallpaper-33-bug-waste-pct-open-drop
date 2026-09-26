@@ -95,3 +95,39 @@ def test_changing_default_does_not_rewrite_old_run(db):
     new = estimate_service.run_estimate(1, 1, False, "", waste_enabled=True)
     assert new["waste_pct"] == 50.0
     assert new["order_rolls"] == 17
+
+
+def test_get_run_pins_written_base_pct_and_order(db):
+    out = estimate_service.run_estimate(1, 1, True, "下单", waste_enabled=True, waste_pct=10)
+    run_id = out["run_id"]
+    from app.repositories import history
+
+    run = history.get_run(run_id)
+    assert run is not None
+    saved = run["result"]
+    # 详情必须钉住写入时的关系：基础 11、备损 10%、订货 13
+    assert saved["rolls"] == 11
+    assert saved["waste_enabled"] is True
+    assert saved["waste_pct"] == 10.0
+    assert saved["order_rolls"] == 13
+    # 不应残留任何"开放视图"整形标记
+    assert "open_waste_dropped" not in saved
+    assert "list_order_rolls_pin" not in saved
+
+
+def test_get_run_unknown_id_returns_none(db):
+    from app.repositories import history
+
+    assert history.get_run(99999) is None
+
+
+def test_get_run_old_order_survives_new_default(db):
+    out = estimate_service.run_estimate(1, 1, True, "旧单", waste_enabled=True, waste_pct=10)
+    run_id = out["run_id"]
+    from app.repositories import history, settings_repo
+
+    settings_repo.set_default_waste_pct(50)
+    # 改默认百分比后，按编号打开旧详情仍是写入时订货 13，不跟随新默认
+    saved = history.get_run(run_id)["result"]
+    assert saved["waste_pct"] == 10.0
+    assert saved["order_rolls"] == 13

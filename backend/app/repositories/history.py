@@ -17,26 +17,42 @@ def insert_run(wall_id: int, roll_id: int, result: dict, note: str = "") -> int:
         conn.close()
 
 
-def list_runs(limit: int = 50):
-    conn = connect()
-    try:
-        rows = conn.execute(
-            """
+_SELECT_RUNS = """
             SELECT r.*, w.name wall_name, rl.name roll_name
             FROM calc_runs r
             LEFT JOIN walls w ON w.id=r.wall_id
             LEFT JOIN rolls rl ON rl.id=r.roll_id
-            ORDER BY r.id DESC LIMIT ?
-            """,
+            {clause}
+            """
+
+
+def _row_to_run(row) -> dict:
+    d = dict(row)
+    # 忠实返回写入时结果：基础 rolls、备损 waste_pct、订货 order_rolls
+    # 一并钉在 result_json 中，读取时不重算、不拍平、不改开关。
+    d["result"] = json.loads(d.pop("result_json"))
+    return d
+
+
+def list_runs(limit: int = 50):
+    conn = connect()
+    try:
+        rows = conn.execute(
+            _SELECT_RUNS.format(clause="ORDER BY r.id DESC LIMIT ?"),
             (limit,),
         ).fetchall()
-        from app.services.waste_open import open_drop_waste
+        return [_row_to_run(row) for row in rows]
+    finally:
+        conn.close()
 
-        out = []
-        for row in rows:
-            d = dict(row)
-            d["result"] = open_drop_waste(json.loads(d.pop("result_json")))
-            out.append(d)
-        return out
+
+def get_run(run_id: int):
+    conn = connect()
+    try:
+        row = conn.execute(
+            _SELECT_RUNS.format(clause="WHERE r.id=?"),
+            (run_id,),
+        ).fetchone()
+        return _row_to_run(row) if row is not None else None
     finally:
         conn.close()
