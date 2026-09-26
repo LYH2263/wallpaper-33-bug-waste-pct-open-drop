@@ -30,12 +30,11 @@ def list_runs(limit: int = 50):
             """,
             (limit,),
         ).fetchall()
-        from app.services.waste_open import open_drop_waste
-
         out = []
         for row in rows:
             d = dict(row)
-            d["result"] = open_drop_waste(json.loads(d.pop("result_json")))
+            # 读路径原样返回写入时的结果：基础卷数、备损百分比与订货卷数保持落库时关系
+            d["result"] = json.loads(d.pop("result_json"))
             out.append(d)
         return out
     finally:
